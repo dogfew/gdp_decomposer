@@ -95,6 +95,9 @@ class BaseDecomposer:
         """
         if mode == 'scipy':
             self.fit_scipy(multistarts, reg, x0, verbose, loss_function, *args, **kwargs)
+        else:
+            raise NotImplementedError
+        return self
 
     def calc_loss(self, reg=0., loss_function='mse'):
         """
@@ -231,3 +234,5 @@ class Decomposer(BaseDecomposer):
                  base_coefficients=self.base_coefficients,
                  targets=self.targets.to_numpy())
 
+    def __str__(self):
+        return f"Decomposer with (n_components={self.n_components}, n_branches={self.n_branches})"
