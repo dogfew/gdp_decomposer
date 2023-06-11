@@ -88,7 +88,7 @@ class BaseDecomposer:
         :param x0:
         :param verbose: выводить ли отладку из scipy
         :param mode:
-        :param loss_function:
+        :param loss_function: ['mse', 'mre', 'mae']
         :param args: аргументы для scipy-minimize
         :param kwargs: ключевые аргументы для scipy-minimize
         :return:
@@ -236,3 +236,15 @@ class Decomposer(BaseDecomposer):
 
     def __str__(self):
         return f"Decomposer with (n_components={self.n_components}, n_branches={self.n_branches})"
+
+    def estimate_x(self, x, base_x):
+        p_X = self.targets.to_numpy().T
+        coef0 = base_x / base_x[-1]
+        coef1 = (self.alpha[:, -1][:, None] / self.alpha)
+        coef2 = (self.components / self.components[-1]) * coef0[:, None]
+        coef3 = 1 / (self.rho - 1)
+        omega = ((coef2[None, :, :] * coef1[:, :, None]) ** coef3[:, None])
+        omega = omega.transpose(1, 0, 2)
+        nom = omega * base_x[:, None, None] * x.T * p_X[None, :, :]
+        denom = np.sum(omega * self.components[:, None, :] * base_x[:, None, None], axis=0)
+        return nom / denom
