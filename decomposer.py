@@ -237,14 +237,21 @@ class Decomposer(BaseDecomposer):
     def __str__(self):
         return f"Decomposer with (n_components={self.n_components}, n_branches={self.n_branches})"
 
-    def estimate_x(self, x, base_x):
+    def estimate_x(self, x, base_x=None):
+        """
+        :param base_x: изначальные значения
+        :param x: матрица с объёмами продукции
+        :return:
+        """
+        if base_x is None:
+            base_x = x[0][:, None] * self.alpha
         p_X = self.targets.to_numpy().T
-        coef0 = base_x / base_x[-1]
+        coef0 = base_x / base_x[:, -1, None]
         coef1 = (self.alpha[:, -1][:, None] / self.alpha)
-        coef2 = (self.components / self.components[-1]) * coef0[:, None]
+        coef2 = (self.components / self.components[-1])[None, :, :] * coef0[:, :, None]
         coef3 = 1 / (self.rho - 1)
-        omega = ((coef2[None, :, :] * coef1[:, :, None]) ** coef3[:, None])
+        omega = ((coef2[:, :, :] * coef1[:, :, None]) ** coef3[:, None])
         omega = omega.transpose(1, 0, 2)
-        nom = omega * base_x[:, None, None] * x.T * p_X[None, :, :]
-        denom = np.sum(omega * self.components[:, None, :] * base_x[:, None, None], axis=0)
+        nom = omega * base_x.T[:, :, None] * x.T * p_X[None, :, :]
+        denom = np.sum(omega * self.components[:, None, :] * omega * base_x.T[:, :, None], axis=0)
         return nom / denom
