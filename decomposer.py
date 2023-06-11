@@ -109,9 +109,9 @@ class BaseDecomposer:
         if loss_function == 'mre':
             total_loss = ((1 - self.predictions / self.__targets) ** 2).sum()
         elif loss_function == 'mse':
-            total_loss = np.sum((self.targets.to_numpy().T - self.predictions) ** 2)
+            total_loss = np.sum((self.__targets - self.predictions) ** 2)
         else:
-            total_loss = np.sum(np.abs(self.targets.to_numpy().T - self.predictions))
+            total_loss = np.sum(np.abs(self.__targets - self.predictions))
         if reg != 0:
             diff = self.components[:, 1:] - self.components[:, :-1]
             total_loss += np.sum(diff[:, 1:] ** 2 + diff[:, :-1] ** 2) * reg
