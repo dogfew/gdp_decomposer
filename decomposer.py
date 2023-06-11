@@ -239,14 +239,17 @@ class Decomposer(BaseDecomposer):
 
     def estimate_x(self, x, base_x=None):
         """
+        Оценить компоненты ВВП
         :param x: матрица с объёмами продукции
-        :param base_x: изначальные значения (X0 для каждой компоненты для каждого продукта ВВП)
+        :param base_x: изначальные значения (X0 для каждой компоненты для каждого продукта ВВП, по умолчанию --
+        произведение фактических X0 на alpha)
         :return:
         """
         if base_x is None:
             base_x = x[0][:, None] * self.alpha
         p_X = self.targets.to_numpy().T
         coef0 = base_x / base_x[:, -1, None]
+
         coef1 = (self.alpha[:, -1][:, None] / self.alpha)  # первый множитель внутри омеги
         coef2 = (self.components / self.components[-1])[None, :, :] * coef0[:, :, None]  # второй множитель там же
         coef3 = 1 / (self.rho - 1)  # степень, в которую возводится coef1 * coef2
@@ -255,3 +258,37 @@ class Decomposer(BaseDecomposer):
         nom = omega * base_x.T[:, :, None] * x.T * p_X[None, :, :]  # числитель
         denom = np.sum(omega * self.components[:, None, :] * omega * base_x.T[:, :, None], axis=0)  # знаменатель
         return nom / denom
+
+    def auto_estimate_x(self, x, loss_function='mspe', verbose=False, return_x=False, *args, **kwargs):
+        """
+        Оценить компоненты ВВП, автоматически подбирая оптимальные стартовые значения
+        :param x:  матрица с объёмами продукции
+        :param verbose: показывать ли результаты оптимизации
+        :param return_x: возвращать ли матрицу изначальных цен
+        :param loss_function: функция потерь для подбора апарметров
+        :return:
+        """
+        loss_function = loss_function.lower()
+
+        def target_function(base_x_):
+            base_x_ = base_x_.reshape(self.alpha.shape)
+            pred = self.estimate_x(x, base_x_)
+            if loss_function == 'mse':
+                return np.mean((x.T - pred) ** 2)
+            elif loss_function == 'mape':
+                return np.mean(np.abs((x.T - pred) / x.T), axis=(0, 1)).sum()
+            elif loss_function == 'mspe':
+                return np.mean(((x.T - pred) / x.T) ** 2, axis=(0, 1)).sum()
+            else:
+                return np.mean(np.abs(np.log(pred) - np.log(x.T)), axis=(0, 1)).sum()
+
+        x0 = x[0][:, None] * self.alpha
+        results = minimize(target_function, x0.flatten(),
+                           bounds=Bounds(x0.min(), x0.max(), keep_feasible=True),
+                           options=kwargs, *args)
+        base_x = results.x.reshape(self.alpha.shape)
+        if verbose:
+            print(results)
+        if return_x:
+            return self.estimate_x(x, base_x), base_x
+        return self.estimate_x(x, base_x)
